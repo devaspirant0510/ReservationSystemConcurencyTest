@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${room.name} + ' 재고 달력'">객실 재고</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .calendar {display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+        .day-cell {min-height:90px;border:1px solid #dee2e6;border-radius:6px;padding:4px;font-size:0.8rem;position:relative;}
+        .day-number {font-weight:600;}
+        .other-month {background:#f8f9fa;color:#adb5bd;}
+        .avail-badge {position:absolute;bottom:4px;left:4px;right:4px;font-size:0.7rem;}
+        .low {background:#ffe5e5;}
+        .mid {background:#fff7e0;}
+        .full {background:#e7f9ed;}
+    </style>
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0" th:text="${room.name} + ' 재고 현황'">객실 재고 현황</h1>
+        <a href="/" class="btn btn-outline-secondary btn-sm">뒤로</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <button class="btn btn-sm btn-outline-primary" id="prevMonth">이전</button>
+            <h2 class="h5 mb-0" id="monthTitle" th:text="${year} + '년 ' + ${month} + '월'">2025년 1월</h2>
+            <button class="btn btn-sm btn-outline-primary" id="nextMonth">다음</button>
+        </div>
+    </div>
+
+    <div id="calendarContainer" class="card">
+        <div class="card-body">
+            <div class="calendar" id="calendarGrid"></div>
+            <div class="mt-3 small text-muted">색상 안내: <span class="badge bg-success">여유</span> <span class="badge bg-warning text-dark">보통</span> <span class="badge bg-danger">소량</span></div>
+        </div>
+    </div>
+</div>
+<script>
+    const roomId = [[${room.id}]];
+    let currentYear = [[${year}]];
+    let currentMonth = [[${month}]]; // 1-12
+
+    function buildCalendar(year, month, data){
+        const grid = document.getElementById('calendarGrid');
+        grid.innerHTML='';
+        const first = new Date(year, month-1, 1);
+        const startDay = first.getDay(); // 0 Sun
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const prevMonthDays = new Date(year, month-1, 0).getDate();
+
+        // fill previous blanks
+        for(let i=0;i<startDay;i++){
+            const d = document.createElement('div');
+            d.className='day-cell other-month';
+            d.innerHTML = `<div class='day-number'>${prevMonthDays - startDay + 1 + i}</div>`;
+            grid.appendChild(d);
+        }
+        for(let day=1; day<=daysInMonth; day++){
+            const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const avail = data[dateStr];
+            const cell = document.createElement('div');
+            cell.className='day-cell';
+            let levelClass='full';
+            if(avail === 0){levelClass='low';}
+            else if(avail !== undefined){
+                if(avail <= 2) levelClass='low';
+                else if(avail <=5) levelClass='mid';
+                else levelClass='full';
+            }
+            cell.classList.add(levelClass);
+            cell.innerHTML = `<div class='day-number'>${day}</div>` +
+                `<div class='avail-badge badge bg-light text-dark border'>잔여: ${avail !== undefined ? avail : '-'}</div>`;
+            grid.appendChild(cell);
+        }
+        // trailing cells to complete weeks (optional)
+        while(grid.children.length % 7 !== 0){
+            const idx = grid.children.length % 7 + 1;
+            const d = document.createElement('div');
+            d.className='day-cell other-month';
+            d.innerHTML = `<div class='day-number'>${idx}</div>`;
+            grid.appendChild(d);
+        }
+        document.getElementById('monthTitle').textContent = `${year}년 ${month}월`;
+    }
+
+    function fetchMonth(year, month){
+        fetch(`/${roomId}/availability?year=${year}&month=${month}`)
+            .then(r=>r.json())
+            .then(data=>{ buildCalendar(year, month, data); })
+            .catch(e=>console.error(e));
+    }
+
+    document.getElementById('prevMonth').addEventListener('click', ()=>{
+        currentMonth--; if(currentMonth===0){currentMonth=12; currentYear--;}
+        fetchMonth(currentYear, currentMonth);
+    });
+    document.getElementById('nextMonth').addEventListener('click', ()=>{
+        currentMonth++; if(currentMonth===13){currentMonth=1; currentYear++;}
+        fetchMonth(currentYear, currentMonth);
+    });
+
+    // initial load via API
+    fetchMonth(currentYear, currentMonth);
+</script>
+</body>
+</html>

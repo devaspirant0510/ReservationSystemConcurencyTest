@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hotel Rooms</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">예약 시스템</a>
+    </div>
+</nav>
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">객실 목록</h1>
+        <div>
+            <!-- Placeholder for future actions (e.g., add room, search) -->
+            <button type="button" class="btn btn-outline-primary btn-sm" disabled>객실 추가</button>
+        </div>
+    </div>
+
+    <div th:if="${#lists.isEmpty(rooms)}" class="alert alert-info">객실이 없습니다.</div>
+
+    <div th:if="${!#lists.isEmpty(rooms)}" class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-dark">
+                    <tr>
+                        <th scope="col" style="width:5%">#</th>
+                        <th scope="col">객실명</th>
+                        <th scope="col" style="width:15%">정원</th>
+                        <th scope="col" style="width:15%">1박 요금</th>
+                        <th scope="col" style="width:15%">액션</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="room, iterStat : ${rooms}">
+                        <th scope="row" th:text="${iterStat.index + 1}"></th>
+                        <td th:text="${room.name}"></td>
+                        <td th:text="${room.roomCapacity}"></td>
+                        <td th:text="${room.price != null ? #numbers.formatDecimal(room.price, 0, 'COMMA', 2, 'POINT') + ' 원' : '-'}"></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" type="button"
+                                    th:attr="data-room-id=${room.id},data-room-name=${room.name},data-room-capacity=${room.roomCapacity},data-room-price=${room.price}"
+                                    onclick="openReservation(this)">예약</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reservation Section -->
+    <div id="reservationSection" class="mt-4 d-none">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white py-2">
+                <strong id="reservationRoomTitle">예약</strong>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/reservations" id="reservationForm" class="row g-3">
+                    <input type="hidden" name="roomId" id="roomId">
+                    <input type="hidden" name="totalPrice" id="totalPrice">
+                    <div class="col-md-3">
+                        <label for="checkIn" class="form-label">체크인</label>
+                        <input type="date" class="form-control" id="checkIn" name="checkIn" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="checkOut" class="form-label">체크아웃</label>
+                        <input type="date" class="form-control" id="checkOut" name="checkOut" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="guestCount" class="form-label">인원</label>
+                        <select class="form-select" id="guestCount" name="capacity" required></select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">가격 요약</label>
+                        <div class="border rounded p-2 bg-light">
+                            <div class="small text-muted" id="pricePerNightLabel"></div>
+                            <div id="nightsInfo" class="fw-semibold"></div>
+                            <div id="totalPriceDisplay" class="fs-5 text-primary"></div>
+                            <div id="formulaDisplay" class="small text-muted"></div>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex justify-content-between">
+                        <div class="small" id="validationMsg"></div>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary me-2" onclick="cancelReservation()">취소</button>
+                            <button type="submit" class="btn btn-success" id="submitBtn" disabled>예약하기</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer class="pt-4 text-muted small text-center">&copy; <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}"></span> 예약 시스템</footer>
+</div>
+
+<!-- Bootstrap JS (optional for interactive components) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script>
+    const section = document.getElementById('reservationSection');
+    const roomIdInput = document.getElementById('roomId');
+    const totalPriceInput = document.getElementById('totalPrice');
+    const checkInEl = document.getElementById('checkIn');
+    const checkOutEl = document.getElementById('checkOut');
+    const guestSelect = document.getElementById('guestCount');
+    const nightsInfo = document.getElementById('nightsInfo');
+    const totalPriceDisplay = document.getElementById('totalPriceDisplay');
+    const validationMsg = document.getElementById('validationMsg');
+    const pricePerNightLabel = document.getElementById('pricePerNightLabel');
+    const submitBtn = document.getElementById('submitBtn');
+    const title = document.getElementById('reservationRoomTitle');
+    const formulaDisplay = document.getElementById('formulaDisplay');
+
+    let currentRoomPrice = 0;
+
+    function openReservation(btn){
+        const roomId = btn.getAttribute('data-room-id');
+        const roomName = btn.getAttribute('data-room-name');
+        const capacity = parseInt(btn.getAttribute('data-room-capacity')) || 1;
+        const price = btn.getAttribute('data-room-price');
+        currentRoomPrice = price ? parseFloat(price) : 0;
+        title.textContent = '예약 - ' + roomName;
+        roomIdInput.value = roomId;
+        // Populate guest select
+        guestSelect.innerHTML = '';
+        for(let i=1;i<=capacity;i++){
+            const opt = document.createElement('option');
+            opt.value = i; opt.textContent = i + '명';
+            guestSelect.appendChild(opt);
+        }
+        pricePerNightLabel.textContent = currentRoomPrice ? '1박 요금: ' + formatCurrency(currentRoomPrice) : '요금 정보 없음';
+        checkInEl.value = '';
+        checkOutEl.value = '';
+        nightsInfo.textContent = '';
+        totalPriceDisplay.textContent = '';
+        formulaDisplay.textContent = '';
+        totalPriceInput.value = '';
+        validationMsg.textContent = '';
+        validationMsg.className = 'small';
+        submitBtn.disabled = true;
+        section.classList.remove('d-none');
+        section.scrollIntoView({behavior:'smooth'});
+    }
+
+    function cancelReservation(){
+        section.classList.add('d-none');
+    }
+
+    function formatCurrency(val){
+        return val.toLocaleString('ko-KR',{minimumFractionDigits:0}) + '원';
+    }
+
+    function recompute(){
+        const ci = checkInEl.value; const co = checkOutEl.value;
+        const guestCnt = parseInt(guestSelect.value || '0');
+        validationMsg.className = 'small';
+        validationMsg.textContent='';
+        submitBtn.disabled = true;
+        totalPriceInput.value='';
+        totalPriceDisplay.textContent='';
+        formulaDisplay.textContent='';
+        if(!ci || !co) return;
+        const start = new Date(ci + 'T00:00:00');
+        const end = new Date(co + 'T00:00:00');
+        if(end <= start){
+            validationMsg.textContent = '체크아웃 날짜는 체크인 이후여야 합니다.';
+            validationMsg.classList.add('text-danger');
+            return;
+        }
+        const msPerDay = 1000*60*60*24;
+        const nights = Math.round((end - start)/msPerDay);
+        nightsInfo.textContent = '총 ' + nights + '박 / ' + guestCnt + '명';
+        if(currentRoomPrice){
+            const total = nights * currentRoomPrice * (guestCnt || 1);
+            totalPriceDisplay.textContent = '총 금액: ' + formatCurrency(total);
+            formulaDisplay.textContent = '(' + formatCurrency(currentRoomPrice) + ' x ' + nights + '박 x ' + guestCnt + '명)';
+            totalPriceInput.value = total;
+            if(guestCnt > 0) submitBtn.disabled = false;
+        } else {
+            totalPriceDisplay.textContent = '요금 정보 없음';
+        }
+    }
+
+    checkInEl.addEventListener('change', recompute);
+    checkOutEl.addEventListener('change', recompute);
+    guestSelect.addEventListener('change', recompute);
+</script>
+</body>
+</html>
